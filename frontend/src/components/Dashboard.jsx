@@ -33,11 +33,8 @@ function Dashboard({ searchQuery = '' }) {
   };
 
   const handleFrameCapture = async (classroomId, frameBase64) => {
-    try {
-      await analyzeFrame(classroomId, frameBase64);
-    } catch (err) {
-      console.error(`Analyze frame for ${classroomId}:`, err.message);
-    }
+    // Don't catch errors here - let ClassCard handle them for error tracking
+    await analyzeFrame(classroomId, frameBase64);
   };
 
   // Create a map of video_id -> video URL for quick lookup

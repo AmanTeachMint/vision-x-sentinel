@@ -9,6 +9,37 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const audioIntervalRef = useRef(null);
+  const consecutiveFailuresRef = useRef(0);
+  const retryCheckIntervalRef = useRef(null);
+  const MAX_CONSECUTIVE_FAILURES = 3; // Stop after 3 consecutive failures
+  const RETRY_CHECK_INTERVAL = 5000; // Check every 5 seconds if server is back
+
+  // Auto-play video when it loads
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    const tryAutoPlay = async () => {
+      try {
+        await video.play();
+        // Dispatch a synthetic 'play' event to ensure frame capture starts
+        // This ensures handlePlay is called even if the native event doesn't fire
+        if (!video.paused) {
+          video.dispatchEvent(new Event('play'));
+        }
+      } catch (err) {
+        // Autoplay blocked - user interaction required
+        console.log(`Autoplay blocked for ${classroom.id}, video will play on user interaction`);
+      }
+    };
+
+    if (video.readyState >= 2) {
+      tryAutoPlay();
+    } else {
+      video.addEventListener('loadeddata', tryAutoPlay);
+      return () => video.removeEventListener('loadeddata', tryAutoPlay);
+    }
+  }, [classroom.id, videoUrl]);
 
   // Start/stop frame capture when video plays/pauses
   useEffect(() => {
@@ -63,28 +94,83 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
       }
     };
 
-    const handlePlay = () => {
-      setIsPlaying(true);
+    const startFrameCapture = () => {
+      // Reset failure count when starting
+      consecutiveFailuresRef.current = 0;
+      
+      // Clear any existing interval
+      if (captureIntervalRef.current) {
+        clearInterval(captureIntervalRef.current);
+      }
+      
       // Set canvas dimensions to match video (or fixed size)
       canvas.width = 640;
       canvas.height = 360;
       
       // Start capturing frames every 1.5 seconds
-      captureIntervalRef.current = setInterval(() => {
+      captureIntervalRef.current = setInterval(async () => {
         if (video.readyState >= 2) {
           try {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const frameBase64 = canvas.toDataURL('image/jpeg', 0.8);
             if (onFrameCapture && frameBase64) {
-              onFrameCapture(classroom.id, frameBase64);
+              try {
+                await onFrameCapture(classroom.id, frameBase64);
+                // Success - reset failure count
+                consecutiveFailuresRef.current = 0;
+              } catch (err) {
+                // API call failed
+                consecutiveFailuresRef.current += 1;
+                console.warn(`Frame capture API failed for ${classroom.id} (${consecutiveFailuresRef.current}/${MAX_CONSECUTIVE_FAILURES}):`, err.message);
+                
+                // Stop frame capture after too many consecutive failures
+                if (consecutiveFailuresRef.current >= MAX_CONSECUTIVE_FAILURES) {
+                  console.warn(`Stopping frame capture for ${classroom.id} after ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Server may be down.`);
+                  if (captureIntervalRef.current) {
+                    clearInterval(captureIntervalRef.current);
+                    captureIntervalRef.current = null;
+                  }
+                  
+                  // Start retry check interval to resume when server comes back
+                  if (!retryCheckIntervalRef.current) {
+                    retryCheckIntervalRef.current = setInterval(async () => {
+                      // Try a test frame capture to see if server is back
+                      if (video.readyState >= 2 && !video.paused) {
+                        try {
+                          const ctx = canvas.getContext('2d');
+                          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                          const frameBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                          if (onFrameCapture && frameBase64) {
+                            await onFrameCapture(classroom.id, frameBase64);
+                            // Server is back! Resume frame capture
+                            console.log(`Server is back for ${classroom.id}, resuming frame capture.`);
+                            if (retryCheckIntervalRef.current) {
+                              clearInterval(retryCheckIntervalRef.current);
+                              retryCheckIntervalRef.current = null;
+                            }
+                            startFrameCapture();
+                          }
+                        } catch (err) {
+                          // Server still down, keep checking
+                          // Don't log to avoid spam
+                        }
+                      }
+                    }, RETRY_CHECK_INTERVAL);
+                  }
+                }
+              }
             }
           } catch (e) {
             console.warn('Frame capture failed (possible CORS/tainted canvas):', e.message);
           }
         }
       }, 1500);
+    };
 
+    const handlePlay = () => {
+      setIsPlaying(true);
+      startFrameCapture();
       // Setup audio capture
       setupAudioCapture();
     };
@@ -95,6 +181,10 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
         clearInterval(captureIntervalRef.current);
         captureIntervalRef.current = null;
       }
+      if (retryCheckIntervalRef.current) {
+        clearInterval(retryCheckIntervalRef.current);
+        retryCheckIntervalRef.current = null;
+      }
       if (audioIntervalRef.current) {
         clearInterval(audioIntervalRef.current);
         audioIntervalRef.current = null;
@@ -104,6 +194,7 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
         audioContextRef.current = null;
       }
       analyserRef.current = null;
+      consecutiveFailuresRef.current = 0;
     };
 
     const handlePause = () => {
@@ -117,6 +208,11 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
     video.addEventListener('ended', handleEnded);
+
+    // If video is already playing (e.g., from autoplay), start frame capture immediately
+    if (!video.paused && video.readyState >= 2) {
+      handlePlay();
+    }
 
     return () => {
       video.removeEventListener('play', handlePlay);
@@ -163,6 +259,8 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
             controls
             playsInline
             muted
+            autoPlay
+            loop
             style={{ maxHeight: '240px' }}
           />
         ) : (
