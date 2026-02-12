@@ -5,6 +5,8 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [useCamera, setUseCamera] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
   const captureIntervalRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -14,15 +16,85 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
   const retryCheckIntervalRef = useRef(null);
   const onFrameCaptureRef = useRef(onFrameCapture);
   const isSeekingRef = useRef(false);
+  const cameraStreamRef = useRef(null);
   const MAX_CONSECUTIVE_FAILURES = 3;
   const RETRY_CHECK_INTERVAL = 5000;
 
   onFrameCaptureRef.current = onFrameCapture;
 
-  // Auto-play video when it loads
+  // Handle camera stream setup/cleanup
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !videoUrl) return;
+    if (!video) return;
+
+    if (useCamera) {
+      // Request camera access
+      const enableCamera = async () => {
+        try {
+          setCameraError(null);
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user' }, // Front camera
+            audio: true
+          });
+          cameraStreamRef.current = stream;
+          video.srcObject = stream;
+          video.muted = false; // Camera audio should not be muted
+          
+          // Wait for video to be ready, then play
+          const waitForReady = () => {
+            return new Promise((resolve) => {
+              if (video.readyState >= 2) {
+                resolve();
+              } else {
+                video.addEventListener('loadedmetadata', resolve, { once: true });
+              }
+            });
+          };
+          
+          await waitForReady();
+          await video.play();
+          
+          // Ensure play event fires to start frame/audio capture
+          // Use a small delay to ensure event listeners are set up
+          setTimeout(() => {
+            if (!video.paused && video.readyState >= 2) {
+              video.dispatchEvent(new Event('play', { bubbles: true }));
+            }
+          }, 200);
+        } catch (err) {
+          console.error('Camera access failed:', err);
+          setCameraError(err.message || 'Camera access denied');
+          setUseCamera(false);
+        }
+      };
+      enableCamera();
+    } else {
+      // Stop camera stream if switching back to video file
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(track => track.stop());
+        cameraStreamRef.current = null;
+      }
+      // Reset to video file if available
+      if (videoUrl) {
+        video.srcObject = null;
+        video.src = videoUrl;
+        video.muted = true; // Video files start muted for autoplay
+      }
+    }
+
+    return () => {
+      // Cleanup camera stream on unmount
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(track => track.stop());
+        cameraStreamRef.current = null;
+      }
+    };
+  }, [useCamera, classroom.id, videoUrl]);
+
+  // Auto-play video when it loads (only for video files, not camera)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl || useCamera) return;
 
     const tryAutoPlay = async () => {
       try {
@@ -41,13 +113,24 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
       video.addEventListener('loadeddata', tryAutoPlay);
       return () => video.removeEventListener('loadeddata', tryAutoPlay);
     }
-  }, [classroom.id, videoUrl]);
+  }, [classroom.id, videoUrl, useCamera]);
 
   // Start/stop frame capture and audio when video plays/pauses
   useEffect(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
+    
+    // If camera is active and video is playing, ensure capture starts
+    if (useCamera && !video.paused && video.readyState >= 2) {
+      // Small delay to ensure everything is ready
+      const timer = setTimeout(() => {
+        if (!captureIntervalRef.current && !audioIntervalRef.current) {
+          handlePlay();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
 
     const setupAudioCapture = () => {
       try {
@@ -188,6 +271,12 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
       audioResumeHandlerRef.current = null;
       analyserRef.current = null;
       consecutiveFailuresRef.current = 0;
+      
+      // Stop camera stream if active
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(track => track.stop());
+        cameraStreamRef.current = null;
+      }
     };
 
     const handleSeeking = () => {
@@ -220,11 +309,19 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
     video.addEventListener('seeking', handleSeeking);
     video.addEventListener('seeked', handleSeeked);
 
+    // Check if video is already playing (for camera or autoplay)
+    let playTimer = null;
     if (!video.paused && video.readyState >= 2) {
-      handlePlay();
+      // Small delay to ensure everything is initialized
+      playTimer = setTimeout(() => {
+        if (!captureIntervalRef.current && !audioIntervalRef.current) {
+          handlePlay();
+        }
+      }, 100);
     }
 
     return () => {
+      if (playTimer) clearTimeout(playTimer);
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('ended', handleEnded);
@@ -232,7 +329,7 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
       video.removeEventListener('seeked', handleSeeked);
       cleanup();
     };
-  }, [classroom.id]);
+  }, [classroom.id, useCamera]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -255,23 +352,40 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
           {hasNewAlert && (
             <span className="text-xs bg-amber-500/80 text-black px-1.5 py-0.5 rounded font-medium">New alert</span>
           )}
+          <button
+            onClick={() => setUseCamera(!useCamera)}
+            className={`text-xs px-2 py-1 rounded transition-colors ${
+              useCamera 
+                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+            }`}
+            title={useCamera ? 'Switch to video file' : 'Use live camera'}
+          >
+            {useCamera ? '📹 Live' : '📷 Camera'}
+          </button>
           <span className={`w-2 h-2 rounded-full ${getStatusColor(classroom.current_status)}`}></span>
           <span className="text-sm text-gray-400 capitalize">{classroom.current_status}</span>
         </div>
       </div>
 
       <div className="relative">
-        {finalVideoUrl ? (
+        {cameraError && (
+          <div className="w-full bg-red-900/50 border border-red-700 rounded-md p-3 mb-2">
+            <p className="text-red-300 text-xs">Camera error: {cameraError}</p>
+            <p className="text-red-400 text-xs mt-1">Please allow camera access or switch back to video file.</p>
+          </div>
+        )}
+        {(finalVideoUrl || useCamera) ? (
           <video
             ref={videoRef}
-            src={finalVideoUrl}
-            crossOrigin="anonymous"
+            src={useCamera ? undefined : finalVideoUrl}
+            crossOrigin={useCamera ? undefined : "anonymous"}
             className="w-full rounded-md"
-            controls
+            controls={!useCamera}
             playsInline
-            muted
+            muted={useCamera ? false : true}
             autoPlay
-            loop
+            loop={useCamera ? false : true}
             style={{ maxHeight: '240px' }}
           />
         ) : (
