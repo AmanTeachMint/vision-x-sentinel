@@ -4,11 +4,24 @@
 - Clears frontend/public/mock-media and copies those videos there.
 - Creates 20 classrooms (id "1".."20").
 - Creates video documents with classroom_id (video 1 -> classroom 1, etc.).
+
 Run from backend directory: python scripts/seed_db.py
+
+Environment Variables Required:
+- MONGO_URI: MongoDB connection string
+  - Local: mongodb://localhost:27017/
+  - Atlas: mongodb+srv://username:password@cluster.mongodb.net/vision_x_sentinel
+- MONGO_DB_NAME: Database name (default: vision_x_sentinel)
+
+Example for MongoDB Atlas:
+  export MONGO_URI="mongodb+srv://amanmotghare_db_user:SV4BGryvvbfvAdNh@cluster0.xxxxx.mongodb.net/vision_x_sentinel"
+  python scripts/seed_db.py
 """
 import sys
 import os
 import shutil
+
+
 
 # Add backend root to path so we can import app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -108,6 +121,30 @@ def seed_alerts():
 
 
 def main():
+    """Main seeding function with connection validation."""
+    from app.config import Config
+    
+    print("=" * 60)
+    print("Vision X Sentinel - Database Seeding")
+    print("=" * 60)
+    print(f"MongoDB URI: {Config.MONGO_URI[:50]}..." if len(Config.MONGO_URI) > 50 else f"MongoDB URI: {Config.MONGO_URI}")
+    print(f"Database: {Config.MONGO_DB_NAME}")
+    print("=" * 60)
+    
+    # Test MongoDB connection
+    try:
+        from app.db.store import get_mongo_db
+        db = get_mongo_db()
+        print("✅ MongoDB connection successful!")
+    except Exception as e:
+        print(f"❌ MongoDB connection failed: {e}")
+        print("\nPlease check:")
+        print("1. MONGO_URI environment variable is set correctly")
+        print("2. MongoDB is running (if local) or IP is whitelisted (if Atlas)")
+        print("3. Connection string format is correct")
+        sys.exit(1)
+    
+    print("\nStarting seed process...")
     discovered = sync_mock_media()
     seed_classrooms()
     seed_videos(discovered)
@@ -123,4 +160,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main() 

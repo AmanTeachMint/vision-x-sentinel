@@ -16,13 +16,31 @@ _db = None
 
 
 def get_mongo_db():
-    """Get or create MongoDB database connection."""
+    """Get or create MongoDB database connection.
+    Supports both local MongoDB and MongoDB Atlas (cloud).
+    """
     global _client, _db
     if _client is None:
-        _client = MongoClient(Config.MONGO_URI)
-        _db = _client[Config.MONGO_DB_NAME]
-        # Ensure indexes for better performance
-        _ensure_indexes()
+        try:
+            # Connect to MongoDB (works for both local and Atlas)
+            _client = MongoClient(
+                Config.MONGO_URI,
+                serverSelectionTimeoutMS=5000,  # 5 second timeout
+                connectTimeoutMS=5000
+            )
+            # Test connection
+            _client.admin.command('ping')
+            _db = _client[Config.MONGO_DB_NAME]
+            # Ensure indexes for better performance
+            _ensure_indexes()
+            print(f"✅ Connected to MongoDB: {Config.MONGO_DB_NAME}")
+        except Exception as e:
+            print(f"❌ MongoDB connection failed: {e}")
+            print(f"   URI: {Config.MONGO_URI[:50]}...")  # Show first 50 chars
+            raise ConnectionError(
+                f"Failed to connect to MongoDB. "
+                f"Check MONGO_URI environment variable. Error: {str(e)}"
+            )
     return _db
 
 
