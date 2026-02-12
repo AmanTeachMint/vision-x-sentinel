@@ -1,7 +1,15 @@
 """MongoDB store: get/insert classrooms, alerts, and videos."""
 from pymongo import MongoClient
 from app.config import Config
-from app.db.schema import TABLE_CLASSROOMS, TABLE_ALERTS, TABLE_VIDEOS, default_classroom, default_alert, default_video
+from app.db.schema import (
+    TABLE_CLASSROOMS,
+    TABLE_ALERTS,
+    TABLE_VIDEOS,
+    TABLE_ADMIN_PROFILE,
+    default_classroom,
+    default_alert,
+    default_video,
+)
 
 _client = None
 _db = None
@@ -26,6 +34,7 @@ def _ensure_indexes():
     db[TABLE_ALERTS].create_index("timestamp")
     db[TABLE_VIDEOS].create_index("id", unique=True)
     db[TABLE_VIDEOS].create_index("classroom_id")
+    db[TABLE_ADMIN_PROFILE].create_index("id", unique=True)
 
 
 def get_all_classrooms():
@@ -122,3 +131,21 @@ def delete_video(video_id: str):
     collection = db[TABLE_VIDEOS]
     result = collection.delete_one({"id": video_id})
     return result.deleted_count > 0
+
+
+def upsert_admin_profile(profile: dict):
+    """Insert or update admin profile (single doc)."""
+    db = get_mongo_db()
+    collection = db[TABLE_ADMIN_PROFILE]
+    doc = {"id": "admin", **profile}
+    collection.replace_one({"id": "admin"}, doc, upsert=True)
+    doc.pop("_id", None)
+    return doc
+
+
+def get_admin_profile():
+    """Get admin profile or None."""
+    db = get_mongo_db()
+    collection = db[TABLE_ADMIN_PROFILE]
+    result = collection.find_one({"id": "admin"}, {"_id": 0})
+    return result

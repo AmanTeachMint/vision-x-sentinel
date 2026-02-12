@@ -6,9 +6,20 @@ import { getClassrooms } from './api/client';
 function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [classrooms, setClassrooms] = useState([]);
+  const [routeClassId, setRouteClassId] = useState(null);
 
   useEffect(() => {
     loadClassrooms();
+  }, []);
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    const prefix = '/classroom/';
+    if (path.startsWith(prefix)) {
+      setRouteClassId(decodeURIComponent(path.slice(prefix.length)));
+    } else {
+      setRouteClassId(null);
+    }
   }, []);
 
   const loadClassrooms = async () => {
@@ -31,7 +42,7 @@ function App() {
       onSearchChange={setSearchQuery}
       searchValue={searchQuery}
     >
-      <Dashboard searchQuery={searchQuery} />
+      <Dashboard searchQuery={searchQuery} routeClassId={routeClassId} />
     </Layout>
   );
 }

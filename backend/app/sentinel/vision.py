@@ -1,4 +1,4 @@
-"""Vision detection: YOLOv8 person count."""
+"""Vision detection: YOLOv8 person count + teacher zone."""
 import numpy as np
 
 # Patch torch.load for PyTorch 2.6+ compatibility with Ultralytics checkpoints
@@ -16,6 +16,7 @@ _model = None
 
 # COCO class index for "person"
 PERSON_CLASS_ID = 0
+TEACHER_ZONE_BOUNDARY = 0.35  # left 35% of the frame
 
 
 def _get_model():
@@ -27,23 +28,37 @@ def _get_model():
     return _model
 
 
-def count_persons(image: np.ndarray) -> int:
+def detect_persons(image: np.ndarray) -> tuple[int, bool]:
     """
-    Run YOLOv8 on image and return number of persons detected.
+    Run YOLOv8 on image and return number of persons detected and teacher presence.
     :param image: BGR numpy array (e.g. from cv2.imdecode)
-    :return: Count of persons (class "person" in COCO)
+    :return: (count, teacher_present)
     """
     if image is None or image.size == 0:
-        return 0
+        return 0, False
     model = _get_model()
     results = model(image, verbose=False)
+    img_h, img_w = image.shape[:2]
     count = 0
+    teacher_present = False
     for r in results:
         if r.boxes is None:
             continue
-        for cls in r.boxes.cls:
-            if int(cls) == PERSON_CLASS_ID:
-                count += 1
+        for box, cls in zip(r.boxes.xyxy, r.boxes.cls):
+            if int(cls) != PERSON_CLASS_ID:
+                continue
+            count += 1
+            if not teacher_present and img_w > 0:
+                x1, y1, x2, y2 = box.tolist()
+                center_x = (x1 + x2) / 2.0
+                if (center_x / img_w) < TEACHER_ZONE_BOUNDARY:
+                    teacher_present = True
+    return count, teacher_present
+
+
+def count_persons(image: np.ndarray) -> int:
+    """Backward compatible person count."""
+    count, _ = detect_persons(image)
     return count
 
 

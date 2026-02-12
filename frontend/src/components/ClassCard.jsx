@@ -240,6 +240,7 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
       case 'inactive': return 'bg-orange-500';
       case 'empty': return 'bg-yellow-500';
       case 'mischief': return 'bg-red-500';
+      case 'missing_teacher': return 'bg-amber-500';
       default: return 'bg-gray-500';
     }
   };

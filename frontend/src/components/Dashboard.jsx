@@ -3,7 +3,7 @@ import ClassCard from './ClassCard';
 import { getClassrooms, getVideos, analyzeFrame } from '../api/client';
 import { useAlerts } from '../hooks/useAlerts';
 
-function Dashboard({ searchQuery = '' }) {
+function Dashboard({ searchQuery = '', routeClassId = null }) {
   const [classrooms, setClassrooms] = useState([]);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +33,12 @@ function Dashboard({ searchQuery = '' }) {
   };
 
   const handleFrameCapture = useCallback(async (classroomId, frameBase64) => {
-    await analyzeFrame(classroomId, frameBase64);
+    const result = await analyzeFrame(classroomId, frameBase64);
+    if (result?.current_status) {
+      setClassrooms((prev) =>
+        prev.map((c) => (c.id === classroomId ? { ...c, current_status: result.current_status } : c))
+      );
+    }
   }, []);
 
   // Map classroom_id -> video URL (videos have classroom_id; first video per classroom wins)
@@ -45,12 +50,18 @@ function Dashboard({ searchQuery = '' }) {
   });
 
   // Filter classrooms by search query
-  const filteredClassrooms = searchQuery
-    ? classrooms.filter(c => 
+  let filteredClassrooms = searchQuery
+    ? classrooms.filter(c =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.id.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : classrooms;
+
+  if (routeClassId) {
+    filteredClassrooms = classrooms.filter(
+      (c) => c.id.toLowerCase() === routeClassId.toLowerCase()
+    );
+  }
 
   if (loading) {
     return (
@@ -90,6 +101,7 @@ function Dashboard({ searchQuery = '' }) {
           No classrooms found matching "{searchQuery}"
         </div>
       )}
+
     </div>
   );
 }

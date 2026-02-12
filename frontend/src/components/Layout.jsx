@@ -1,9 +1,30 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import LogsPanel from './LogsPanel';
+import { getAdminProfile } from '../api/client';
 
 function Layout({ children, activeCount = 0, inactiveCount = 0, onRefresh, onSearchChange, searchValue = '' }) {
   const [logsOpen, setLogsOpen] = useState(false);
+  const [adminProfile, setAdminProfile] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    getAdminProfile()
+      .then((profile) => setAdminProfile(profile))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (!profileRef.current) return;
+      if (!profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
+      }
+    };
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
 
   const handleBroadcast = () => {
     toast.success('Broadcast sent to all classrooms');
@@ -12,8 +33,62 @@ function Layout({ children, activeCount = 0, inactiveCount = 0, onRefresh, onSea
   return (
     <div className="min-h-screen bg-dark-bg text-dark-text">
       {/* Header */}
-      <header className="bg-dark-card border-b border-gray-700 px-6 py-4">
+      <header className="bg-dark-card border-b border-gray-700 px-6 py-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Vision X Sentinel</h1>
+        <div className="flex items-center gap-3" ref={profileRef}>
+          <div className="text-right">
+            <div className="text-sm font-medium text-gray-100">{adminProfile?.name || 'Admin'}</div>
+            <div className="text-xs text-gray-400">{adminProfile?.email || 'admin@school.org'}</div>
+          </div>
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold"
+            aria-label="Admin profile"
+          >
+            {(adminProfile?.avatar_initials || 'AD').slice(0, 2)}
+          </button>
+          {profileOpen && (
+            <div className="absolute right-6 top-16 bg-dark-card border border-gray-700 rounded-md shadow-lg w-40 z-50">
+              <button
+                onClick={() => {
+                  setProfileOpen(false);
+                  toast.success('Logged out');
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-800 flex items-center gap-2"
+              >
+                <svg
+                  className="w-4 h-4 text-gray-300"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M10 17l5-5-5-5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M15 12H8"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Top bar: Search, Logs, Broadcast */}

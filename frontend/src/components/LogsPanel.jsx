@@ -5,6 +5,7 @@ const ALERT_LABELS = {
   empty_class: 'Empty Class',
   mischief: 'Mischief',
   loud_noise: 'Loud Noise',
+  missing_teacher: 'Missing Teacher',
 };
 
 function LogsPanel({ isOpen, onClose }) {
@@ -48,6 +49,7 @@ function LogsPanel({ isOpen, onClose }) {
     }
   };
 
+
   if (!isOpen) return null;
 
   return (
@@ -78,25 +80,26 @@ function LogsPanel({ isOpen, onClose }) {
                     <th className="pb-2 text-gray-400 font-medium">Time</th>
                     <th className="pb-2 text-gray-400 font-medium">Classroom</th>
                     <th className="pb-2 text-gray-400 font-medium">Type</th>
+                    <th className="pb-2 text-gray-400 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {alerts.map((alert) => (
-                    <tr key={alert.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                      <td className="py-3 text-sm">{formatTime(alert.timestamp)}</td>
-                      <td className="py-3 text-sm font-medium" title={alert.classroom_id}>
-                        {classroomNames[alert.classroom_id] || alert.classroom_id}
-                      </td>
-                      <td className="py-3 text-sm">
-                        <span className="px-2 py-1 bg-gray-700 rounded text-xs">
-                          {ALERT_LABELS[alert.type] || alert.type}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  <tr key={alert.id} className="border-b border-gray-800 hover:bg-gray-800/50">
+                    <td className="py-3 text-sm">{formatTime(alert.timestamp)}</td>
+                    <td className="py-3 text-sm font-medium" title={alert.classroom_id}>
+                      {classroomNames[alert.classroom_id] || alert.classroom_id}
+                    </td>
+                    <td className="py-3 text-sm">
+                      <span className="px-2 py-1 bg-gray-700 rounded text-xs">
+                        {ALERT_LABELS[alert.type] || alert.type}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
           </div>
         )}
 
