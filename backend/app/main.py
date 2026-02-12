@@ -4,6 +4,17 @@ from flask import Flask, request, Response
 
 from app.config import Config
 
+# Validate MongoDB configuration on import
+# This ensures MONGO_URI is set before the app starts
+try:
+    if not Config.MONGO_URI:
+        raise ValueError("MONGO_URI is required but not set")
+except ValueError as e:
+    print(f"❌ Configuration Error: {e}")
+    print("\nPlease set MONGO_URI environment variable.")
+    print("Example: mongodb+srv://username:password@cluster.mongodb.net/vision_x_sentinel")
+    raise
+
 try:
     from flask_cors import CORS
     HAS_FLASK_CORS = True
