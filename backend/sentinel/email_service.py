@@ -4,18 +4,7 @@
 class EmailGenerator:
     """Generate dynamic email content for intervention alerts."""
 
-    def generate_email_content(
-        self,
-        classroom_name,
-        chi_score,
-        primary_issue,
-        duration_mins,
-        incident_time=None,
-        time_window=None,
-        classroom_status=None,
-        dashboard_url="#",
-        snapshot_url=None,
-    ):
+    def generate_email_content(self, classroom_name, chi_score, primary_issue, duration_mins):
         if chi_score < 50:
             subject = (
                 f"⚠️ Intervention Required: {classroom_name} Health Score Critical ({chi_score}/100)"
@@ -25,58 +14,26 @@ class EmailGenerator:
                 f"⚠️ Warning: {classroom_name} Behavioral Stability Dropping ({chi_score}/100)"
             )
         else:
-            subject = f"Status Update: {classroom_name} ({chi_score}/100)"
+            subject = f"📊 Daily Summary: {classroom_name}"
 
         if primary_issue == "missing_teacher":
-            headline = "UNSUPERVISED SESSION"
-            issue_label = "Missing Teacher"
-            recommendation = "Deploy Hallway Monitor or Substitute immediately."
+            recommendation = "UNSUPERVISED SESSION - Deploy Hallway Monitor."
         elif primary_issue == "mischief":
-            headline = "BEHAVIORAL RISK"
-            issue_label = "Mischief"
-            recommendation = "Deploy Security/Principal to room."
+            recommendation = "BEHAVIORAL RISK - Deploy Security."
         elif primary_issue == "loud_noise":
-            headline = "DISTRACTION ALERT"
-            issue_label = "Loud Noise"
-            recommendation = "Notify teacher via intercom to lower volume."
+            recommendation = "DISTRACTION ALERT - Notify teacher via intercom."
         else:
-            headline = "RISK ALERT"
-            issue_label = primary_issue
-            recommendation = "Review classroom conditions."
-
-        incident_time = incident_time or "Now"
-        time_window = time_window or f"Last {duration_mins} min"
-        classroom_status = classroom_status or primary_issue
-
-        snapshot_block = ""
-        if snapshot_url:
-            snapshot_block = (
-                f"<p><b>Snapshot</b></p>"
-                f"<p><a href=\"{snapshot_url}\">View Snapshot</a></p>"
-            )
+            recommendation = "RISK ALERT - Review classroom conditions."
 
         body = (
+            f"<p><b>Automated Supervision Report</b></p>"
             f"<p><b>Risk Analysis</b></p>"
-            f"<p><b>Headline:</b> {headline}</p>"
-            f"<p><b>Classroom:</b> {classroom_name}</p>"
-            f"<p><b>Incident Time:</b> {incident_time} "
-            f"(<b>Window:</b> {time_window})</p>"
-            f"<p><b>Data</b></p>"
-            f"<ul>"
-            f"<li><b>Classroom Status:</b> {classroom_status}</li>"
-            f"<li><b>Score:</b> {chi_score}/100</li>"
-            f"<li><b>Primary Factor:</b> {issue_label}</li>"
-            f"<li><b>Duration:</b> {duration_mins} min</li>"
-            f"</ul>"
+            f"<p>Current CHI Score: <b>{chi_score}/100</b></p>"
+            f"<p>Primary Factor: <b>{primary_issue}</b></p>"
             f"<p><b>Recommendation</b></p>"
             f"<p>{recommendation}</p>"
-            f"{snapshot_block}"
-            f"<p>"
-            f"<a href=\"{dashboard_url}\" "
-            f"style=\"display:inline-block;padding:10px 14px;"
-            f"background:#2563eb;color:#fff;text-decoration:none;"
-            f"border-radius:6px;\">View Live Feed</a>"
-            f"</p>"
+            f"<p>Duration: <b>{duration_mins} min</b></p>"
+            f"<p>[ 📸 View Snapshot ] [ 🔴 Watch Live Feed ]</p>"
         )
 
         return {"subject": subject, "body": body}
