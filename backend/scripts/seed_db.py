@@ -13,38 +13,84 @@ from app.db.store import upsert_classroom, insert_alert, upsert_video
 
 
 def seed_videos():
-    """Seed 8 videos — URLs point to frontend/public/mock-media/ (served by Vite/Vercel)."""
-    videos = [
-        ("video1", "video1.mp4", "/mock-media/video1.mp4", "1"),
-        ("video2", "video2.mp4", "/mock-media/video2.mp4", "2"),
-        ("video3", "video3.mp4", "/mock-media/video3.mp4", "3"),
-        ("video4", "video4.mp4", "/mock-media/video4.mp4", "4"),
-        ("video5", "video5.mp4", "/mock-media/video5.mp4", "5"),
-        ("video6", "video6.mp4", "/mock-media/video6.mp4", "6"),
-        ("video7", "video7.mp4", "/mock-media/video7.mp4", "7"),
-        ("video8", "video8.mp4", "/mock-media/video8.mp4", "8"),
-    ]
-    for vid, filename, url, classroom_id in videos:
-        upsert_video(vid, filename, url, classroom_id)
-    print("Seeded 8 videos (video1–video8). Videos should be in frontend/public/mock-media/")
+    """Seed videos — URLs point to frontend/public/mock-media/ (served by Vite/Vercel).
+    Automatically discovers all .mp4 files from mock-media directory."""
+    # Get the mock-media directory path (repo root)
+    backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    mock_media_dir = os.path.join(backend_root, '..', 'mock-media')
+    
+    # Discover all .mp4 files in mock-media directory
+    discovered_videos = []
+    if os.path.exists(mock_media_dir):
+        for filename in sorted(os.listdir(mock_media_dir)):
+            if filename.endswith('.mp4'):
+                # Use filename without extension as video_id
+                video_id = filename.replace('.mp4', '')
+                url = f"/mock-media/{filename}"
+                discovered_videos.append((video_id, filename, url))
+    
+    # Also check frontend/public/mock-media for any additional videos
+    frontend_mock_media = os.path.join(backend_root, '..', 'frontend', 'public', 'mock-media')
+    if os.path.exists(frontend_mock_media):
+        for filename in sorted(os.listdir(frontend_mock_media)):
+            if filename.endswith('.mp4'):
+                video_id = filename.replace('.mp4', '')
+                url = f"/mock-media/{filename}"
+                # Only add if not already discovered
+                if not any(v[0] == video_id for v in discovered_videos):
+                    discovered_videos.append((video_id, filename, url))
+    
+    # Seed all discovered videos
+    for video_id, filename, url in discovered_videos:
+        upsert_video(video_id, filename, url, None)  # classroom_id will be set when classrooms are created
+    
+    print(f"Seeded {len(discovered_videos)} videos from mock-media directories:")
+    for video_id, filename, url in discovered_videos:
+        print(f"  - {filename} (id: {video_id})")
+    print("  Videos should be in frontend/public/mock-media/")
+    
+    return [v[0] for v in discovered_videos]  # Return list of video_ids
 
 
-def seed_classrooms():
-    """Seed 8 classrooms — each references a video by video_id."""
+def seed_classrooms(video_ids):
+    """Seed classrooms — creates a classroom for each video discovered."""
     now = datetime.utcnow().isoformat() + "Z"
-    classrooms = [
-        ("1", "Class 1", "video1"),
-        ("2", "Class 2", "video2"),
-        ("3", "Class 3", "video3"),
-        ("4", "Class 4", "video4"),
-        ("5", "Class 5", "video5"),
-        ("6", "Class 6", "video6"),
-        ("7", "Class 7", "video7"),
-        ("8", "Class 8", "video8"),
-    ]
+    
+    # Create classrooms for all videos
+    classrooms = []
+    used_ids = set()
+    
+    for idx, video_id in enumerate(video_ids, start=1):
+        # Generate classroom name from video_id
+        classroom_name = f"Class {video_id.replace('_', ' ').title()}"
+        
+        # Determine classroom_id: prefer video number if it's video1-8, otherwise use video_id or index
+        if video_id.startswith('video') and len(video_id) > 5 and video_id[5:].isdigit():
+            classroom_id = video_id[5:]  # Extract number from "video1" -> "1"
+        elif video_id.isalnum() and len(video_id) <= 3:
+            # Use video_id directly if it's short and alphanumeric
+            classroom_id = video_id
+        else:
+            # Use index as fallback, but ensure uniqueness
+            classroom_id = str(idx)
+            counter = 1
+            while classroom_id in used_ids:
+                classroom_id = f"{idx}_{counter}"
+                counter += 1
+        
+        # Ensure uniqueness
+        if classroom_id in used_ids:
+            classroom_id = f"{classroom_id}_{idx}"
+        
+        used_ids.add(classroom_id)
+        classrooms.append((classroom_id, classroom_name, video_id))
+    
     for cid, name, video_id in classrooms:
         upsert_classroom(cid, name=name, current_status="active", video_id=video_id, updated_at=now)
-    print("Seeded 8 classrooms (Class 1–8), each linked to a video.")
+    
+    print(f"\nSeeded {len(classrooms)} classrooms, each linked to a video:")
+    for cid, name, video_id in classrooms:
+        print(f"  - {name} (id: {cid}) -> {video_id}")
 
 
 def seed_alerts():
@@ -57,10 +103,10 @@ def seed_alerts():
 
 
 def main():
-    seed_videos()
-    seed_classrooms()
+    video_ids = seed_videos()
+    seed_classrooms(video_ids)
     seed_alerts()
-    print("Seed complete. MongoDB database:", "vision_x_sentinel")
+    print("\nSeed complete. MongoDB database:", "vision_x_sentinel")
 
 
 if __name__ == "__main__":
