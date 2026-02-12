@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAlerts } from '../api/client';
+import { getAlerts, getClassrooms } from '../api/client';
 
 const ALERT_LABELS = {
   empty_class: 'Empty Class',
@@ -9,21 +9,30 @@ const ALERT_LABELS = {
 
 function LogsPanel({ isOpen, onClose }) {
   const [alerts, setAlerts] = useState([]);
+  const [classroomNames, setClassroomNames] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
-      loadAlerts();
+      loadData();
     }
   }, [isOpen]);
 
-  const loadAlerts = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const data = await getAlerts();
-      setAlerts(data.slice(0, 20));
+      const [alertsData, classroomsData] = await Promise.all([
+        getAlerts(),
+        getClassrooms(),
+      ]);
+      setAlerts(alertsData.slice(0, 20));
+      const nameMap = classroomsData.reduce((acc, c) => {
+        acc[c.id] = c.name;
+        return acc;
+      }, {});
+      setClassroomNames(nameMap);
     } catch (err) {
-      console.error('Failed to load alerts:', err);
+      console.error('Failed to load alerts/classrooms:', err);
     } finally {
       setLoading(false);
     }
@@ -75,7 +84,9 @@ function LogsPanel({ isOpen, onClose }) {
                   {alerts.map((alert) => (
                     <tr key={alert.id} className="border-b border-gray-800 hover:bg-gray-800/50">
                       <td className="py-3 text-sm">{formatTime(alert.timestamp)}</td>
-                      <td className="py-3 text-sm font-medium">{alert.classroom_id}</td>
+                      <td className="py-3 text-sm font-medium" title={alert.classroom_id}>
+                        {classroomNames[alert.classroom_id] || alert.classroom_id}
+                      </td>
                       <td className="py-3 text-sm">
                         <span className="px-2 py-1 bg-gray-700 rounded text-xs">
                           {ALERT_LABELS[alert.type] || alert.type}

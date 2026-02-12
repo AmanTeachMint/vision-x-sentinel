@@ -37,11 +37,13 @@ function Dashboard({ searchQuery = '' }) {
     await analyzeFrame(classroomId, frameBase64);
   };
 
-  // Create a map of video_id -> video URL for quick lookup
-  const videoMap = videos.reduce((acc, video) => {
-    acc[video.id] = video.url;
-    return acc;
-  }, {});
+  // Map classroom_id -> video URL (videos have classroom_id; first video per classroom wins)
+  const classroomIdToVideoUrl = {};
+  videos.forEach((video) => {
+    if (video.classroom_id && !classroomIdToVideoUrl[video.classroom_id]) {
+      classroomIdToVideoUrl[video.classroom_id] = video.url;
+    }
+  });
 
   // Filter classrooms by search query
   const filteredClassrooms = searchQuery
@@ -71,8 +73,8 @@ function Dashboard({ searchQuery = '' }) {
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {filteredClassrooms.map((classroom) => {
-          // Get video URL from videoMap using classroom.video_id
-          const videoUrl = classroom.video_id ? videoMap[classroom.video_id] : null;
+          // Get video URL from videos that have this classroom_id
+          const videoUrl = classroomIdToVideoUrl[classroom.id] || null;
           return (
             <ClassCard
               key={classroom.id}
