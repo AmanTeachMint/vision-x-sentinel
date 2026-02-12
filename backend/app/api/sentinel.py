@@ -5,8 +5,8 @@ import cv2
 import numpy as np
 from flask import Blueprint, request, jsonify
 
-from app.sentinel.vision import count_persons, compute_motion_score
-from app.sentinel.rules import process_empty_class_rule, process_mischief_rule, process_loud_noise_rule
+from app.sentinel.vision import detect_persons, compute_motion_score
+from app.sentinel.rules import process_empty_class_rule, process_mischief_rule, process_loud_noise_rule, process_missing_teacher_rule
 
 bp = Blueprint("sentinel", __name__, url_prefix="/api/sentinel")
 
@@ -65,18 +65,47 @@ def analyze_frame():
         prev_frame = state.get("prev_frame")
 
     # Compute person count and motion score
-    person_count = count_persons(image)
+    person_count, teacher_present = detect_persons(image)
     motion_score = compute_motion_score(image, prev_frame)
 
     # Apply rules
     empty_result = process_empty_class_rule(classroom_id, person_count)
     mischief_result = process_mischief_rule(classroom_id, motion_score, image)
+    missing_teacher_result = process_missing_teacher_rule(classroom_id, person_count, teacher_present, image)
+
+    # Status classification (prioritize mischief, then missing_teacher/empty)
+    if mischief_result.get("alert_created"):
+        new_status = "mischief"
+    elif person_count == 0:
+        new_status = "empty"
+    elif person_count >= 1 and not teacher_present:
+        new_status = "missing_teacher"
+    else:
+        new_status = "active"
+
+    from app.db.store import upsert_classroom
+    upsert_classroom(classroom_id, current_status=new_status)
+
+    # Send pending email if status has been stable for 10 seconds
+    from app.sentinel.rules import process_pending_email
+    classroom_name = None
+    try:
+        from app.db.store import get_classroom_by_id
+        classroom = get_classroom_by_id(classroom_id)
+        classroom_name = classroom.get("name") if classroom else None
+    except Exception:
+        classroom_name = None
+    pending_email = process_pending_email(classroom_id, new_status, classroom_name)
 
     return jsonify({
         "classroom_id": classroom_id,
         "person_count": empty_result["person_count"],
         "motion_score": round(mischief_result["motion_score"], 3),
-        "alert_created": empty_result["alert_created"] or mischief_result["alert_created"],
+        "alert_created": empty_result["alert_created"] or mischief_result["alert_created"] or missing_teacher_result["alert_created"],
+        "teacher_present": teacher_present,
+        "email": mischief_result.get("email") or missing_teacher_result.get("email"),
+        "current_status": new_status,
+        "pending_email_sent": True if pending_email else False,
     })
 
 

@@ -123,3 +123,38 @@ export async function sendAudioLevel(classroomId, level) {
   }
   return response.json();
 }
+
+/**
+ * Get admin profile.
+ */
+export async function getAdminProfile() {
+  const response = await fetch(`${API_BASE_URL}/admin/profile`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch admin profile: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * Trigger mock email generation for a classroom.
+ * @param {string} classroomId
+ * @param {number} score
+ * @param {string} issue
+ */
+export async function triggerAlertEmail(classroomId, score, issue) {
+  const response = await fetch(`${API_BASE_URL}/alerts/trigger-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      classroom_id: classroomId,
+      score,
+      issue,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to trigger email: ${response.statusText}`);
+  }
+  return response.json();
+}

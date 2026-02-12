@@ -4,6 +4,7 @@
 TABLE_CLASSROOMS = "classrooms"
 TABLE_ALERTS = "alerts"
 TABLE_VIDEOS = "videos"
+TABLE_ADMIN_PROFILE = "admin_profile"
 
 # Default document shapes (for reference / validation)
 
@@ -47,5 +48,5 @@ def default_video(video_id: str, filename: str, url: str, classroom_id: str = No
 
 
 # Valid values for reference
-CLASSROOM_STATUSES = ("active", "inactive", "empty", "mischief", "loud_noise")
-ALERT_TYPES = ("empty_class", "mischief", "loud_noise")
+CLASSROOM_STATUSES = ("active", "inactive", "empty", "mischief", "loud_noise", "missing_teacher")
+ALERT_TYPES = ("empty_class", "mischief", "loud_noise", "missing_teacher")

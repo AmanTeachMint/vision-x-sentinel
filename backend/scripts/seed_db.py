@@ -26,7 +26,7 @@ import shutil
 # Add backend root to path so we can import app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.db.store import upsert_classroom, insert_alert, upsert_video
+from app.db.store import upsert_classroom, insert_alert, upsert_video, upsert_admin_profile
 
 NUM_CLASSROOMS = 20
 BACKEND_MOCK_MEDIA = "mock-media"  # relative to repo root (parent of backend)
@@ -101,10 +101,13 @@ def seed_classrooms():
 
 def seed_videos(discovered):
     """
-    Create one video document per discovered file. Each video has classroom_id:
-    first video -> '1', second -> '2', ... 20th -> '20', 21st -> '1', etc.
+    Create one video document per discovered file. Randomize assignment so
+    classrooms aren't grouped by file name.
     """
-    for i, (video_id, filename, url) in enumerate(discovered):
+    import random
+    shuffled = list(discovered)
+    random.shuffle(shuffled)
+    for i, (video_id, filename, url) in enumerate(shuffled):
         classroom_id = str((i % NUM_CLASSROOMS) + 1)
         upsert_video(video_id, filename, url, classroom_id=classroom_id)
     print(f"Seeded {len(discovered)} videos with classroom_id (1..{NUM_CLASSROOMS})")
@@ -146,11 +149,14 @@ def main():
     seed_classrooms()
     seed_videos(discovered)
     seed_alerts()
-    print("\n" + "=" * 60)
-    print("✅ Seed complete!")
-    print(f"Database: {Config.MONGO_DB_NAME}")
-    print("Frontend public mock-media synced with backend mock-media.")
-    print("=" * 60)
+    upsert_admin_profile({
+        "name": "Admin",
+        "email": "abha.raut@teachmint.com",
+        "avatar_initials": "AR",
+    })
+    print("Seeded admin profile (abha.raut@teachmint.com)")
+    print("\nSeed complete. MongoDB database: vision_x_sentinel")
+    print("Frontend public mock-media now contains only videos from backend mock-media.")
 
 
 if __name__ == "__main__":

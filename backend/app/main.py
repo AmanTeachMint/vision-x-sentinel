@@ -48,11 +48,13 @@ def create_app():
             return response
     
     # Register API blueprints
-    from app.api import classrooms, alerts, sentinel, videos
+    from app.api import classrooms, alerts, sentinel, videos, admin, snapshots
     app.register_blueprint(classrooms.bp)
     app.register_blueprint(alerts.bp)
     app.register_blueprint(sentinel.bp)
     app.register_blueprint(videos.bp)
+    app.register_blueprint(admin.bp)
+    app.register_blueprint(snapshots.bp)
     
     @app.route('/')
     def hello():
