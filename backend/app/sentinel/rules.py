@@ -8,9 +8,9 @@ import uuid
 EMPTY_CLASS_DURATION_SEC = 10  # 2 minutes
 
 # Mischief detection thresholds
-MOTION_THRESHOLD = 0.25  # Motion score above this triggers increment
-MISCHIEF_CONSECUTIVE_COUNT = 3  # Need this many consecutive high-motion frames
-MISCHIEF_COOLDOWN_SEC = 60  # Don't alert again for this many seconds after an alert
+MOTION_THRESHOLD = 0.05  # TEMP: lower threshold for demo
+MISCHIEF_CONSECUTIVE_COUNT = 1  # TEMP: trigger immediately for demo
+MISCHIEF_COOLDOWN_SEC = 10  # TEMP: shorter cooldown for demo
 
 # Loud noise detection thresholds
 LOUD_NOISE_THRESHOLD = 0.1  # Audio level above this triggers increment
@@ -84,8 +84,8 @@ def process_pending_email(classroom_id: str, current_status: str, classroom_name
             return None
 
         now = time.time()
-        if now - pending.get("created_at", now) < 10:
-            return None
+        # TEMP: send immediately for demo if status is still stable
+        # (no waiting window)
 
         admin = get_admin_profile() or {}
         generator = EmailGenerator()
@@ -94,11 +94,6 @@ def process_pending_email(classroom_id: str, current_status: str, classroom_name
             pending.get("chi_score", 60),
             pending.get("primary_issue", current_status),
             1,
-            incident_time="Now",
-            time_window="Last 10 sec",
-            classroom_status=current_status,
-            dashboard_url=f"{Config.DASHBOARD_URL}/classroom/{classroom_id}",
-            snapshot_url=pending.get("snapshot_url") or Config.SNAPSHOT_PLACEHOLDER_URL,
         )
         email = {
             "to": admin.get("email", "admin@school.org"),
@@ -149,7 +144,8 @@ def process_mischief_rule(classroom_id: str, motion_score: float, current_frame)
     Apply mischief rule: if motion_score > threshold for consecutive frames, create alert.
     Returns dict: { "alert_created": bool, "motion_score": float }.
     """
-    from app.db.store import upsert_classroom, insert_alert, get_classroom_by_id
+    from app.db.store import upsert_classroom, insert_alert, get_classroom_by_id, get_admin_profile
+    from sentinel.email_service import EmailGenerator
 
     lock = _get_lock(classroom_id)
     with lock:

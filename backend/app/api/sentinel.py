@@ -1,5 +1,6 @@
 """Sentinel API: frame analysis (Empty Class detection)."""
 import base64
+import time
 
 import cv2
 import numpy as np
@@ -74,7 +75,18 @@ def analyze_frame():
     missing_teacher_result = process_missing_teacher_rule(classroom_id, person_count, teacher_present, image)
 
     # Status classification (prioritize mischief, then missing_teacher/empty)
-    if mischief_result.get("alert_created"):
+    # Keep mischief status during cooldown window to avoid flipping back immediately
+    from app.sentinel.rules import _get_state
+    mischief_active = False
+    try:
+        state = _get_state(classroom_id)
+        last_mischief = state.get("last_mischief_alert_time")
+        if last_mischief and (time.time() - last_mischief) < 10:
+            mischief_active = True
+    except Exception:
+        mischief_active = False
+
+    if mischief_result.get("alert_created") or mischief_active:
         new_status = "mischief"
     elif person_count == 0:
         new_status = "empty"
