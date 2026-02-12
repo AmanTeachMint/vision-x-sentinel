@@ -12,8 +12,12 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
   const audioResumeHandlerRef = useRef(null);
   const consecutiveFailuresRef = useRef(0);
   const retryCheckIntervalRef = useRef(null);
+  const onFrameCaptureRef = useRef(onFrameCapture);
+  const isSeekingRef = useRef(false);
   const MAX_CONSECUTIVE_FAILURES = 3;
   const RETRY_CHECK_INTERVAL = 5000;
+
+  onFrameCaptureRef.current = onFrameCapture;
 
   // Auto-play video when it loads
   useEffect(() => {
@@ -77,8 +81,8 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
         audioIntervalRef.current = setInterval(() => {
           if (audioContext.state === 'suspended') {
             audioContext.resume().catch(() => {});
-            return;
           }
+          // Always read from analyser (when context is running we get real level; when suspended we get 0)
           analyser.getByteTimeDomainData(dataArray);
           let sum = 0;
           for (let i = 0; i < bufferLength; i++) {
@@ -109,9 +113,10 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const frameBase64 = canvas.toDataURL('image/jpeg', 0.8);
-            if (onFrameCapture && frameBase64) {
+            const fn = onFrameCaptureRef.current;
+            if (fn && frameBase64) {
               try {
-                await onFrameCapture(classroom.id, frameBase64);
+                await fn(classroom.id, frameBase64);
                 consecutiveFailuresRef.current = 0;
               } catch (err) {
                 consecutiveFailuresRef.current += 1;
@@ -127,8 +132,9 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
                           const ctx = canvas.getContext('2d');
                           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                           const frameBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                          if (onFrameCapture && frameBase64) {
-                            await onFrameCapture(classroom.id, frameBase64);
+                          const fn = onFrameCaptureRef.current;
+                          if (fn && frameBase64) {
+                            await fn(classroom.id, frameBase64);
                             if (retryCheckIntervalRef.current) {
                               clearInterval(retryCheckIntervalRef.current);
                               retryCheckIntervalRef.current = null;
@@ -184,12 +190,35 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
       consecutiveFailuresRef.current = 0;
     };
 
-    const handlePause = () => cleanup();
+    const handleSeeking = () => {
+      isSeekingRef.current = true;
+    };
+    
+    const handleSeeked = () => {
+      isSeekingRef.current = false;
+      // After seeking completes, if video is playing, ensure capture is running
+      if (!video.paused && video.readyState >= 2) {
+        // Check if intervals are already running
+        if (!captureIntervalRef.current && !audioIntervalRef.current) {
+          handlePlay();
+        }
+      }
+    };
+    
+    const handlePause = () => {
+      // Don't cleanup if we're seeking (video will resume after seek)
+      if (!isSeekingRef.current) {
+        cleanup();
+      }
+    };
+    
     const handleEnded = () => cleanup();
 
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
     video.addEventListener('ended', handleEnded);
+    video.addEventListener('seeking', handleSeeking);
+    video.addEventListener('seeked', handleSeeked);
 
     if (!video.paused && video.readyState >= 2) {
       handlePlay();
@@ -199,9 +228,11 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('ended', handleEnded);
+      video.removeEventListener('seeking', handleSeeking);
+      video.removeEventListener('seeked', handleSeeked);
       cleanup();
     };
-  }, [classroom.id, onFrameCapture]);
+  }, [classroom.id]);
 
   const getStatusColor = (status) => {
     switch (status) {

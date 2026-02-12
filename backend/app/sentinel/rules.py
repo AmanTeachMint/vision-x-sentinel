@@ -6,12 +6,12 @@ import time
 EMPTY_CLASS_DURATION_SEC = 120  # 2 minutes
 
 # Mischief detection thresholds
-MOTION_THRESHOLD = 0.3  # Motion score above this triggers increment
+MOTION_THRESHOLD = 0.25  # Motion score above this triggers increment
 MISCHIEF_CONSECUTIVE_COUNT = 3  # Need this many consecutive high-motion frames
 MISCHIEF_COOLDOWN_SEC = 60  # Don't alert again for this many seconds after an alert
 
 # Loud noise detection thresholds
-LOUD_NOISE_THRESHOLD = 0.75  # Audio level above this triggers increment
+LOUD_NOISE_THRESHOLD = 0.1  # Audio level above this triggers increment
 LOUD_NOISE_CONSECUTIVE_COUNT = 5  # Need this many consecutive high-level requests
 LOUD_NOISE_COOLDOWN_SEC = 60  # Don't alert again for this many seconds after an alert
 

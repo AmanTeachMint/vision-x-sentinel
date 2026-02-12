@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ClassCard from './ClassCard';
 import { getClassrooms, getVideos, analyzeFrame } from '../api/client';
 import { useAlerts } from '../hooks/useAlerts';
@@ -32,10 +32,9 @@ function Dashboard({ searchQuery = '' }) {
     }
   };
 
-  const handleFrameCapture = async (classroomId, frameBase64) => {
-    // Don't catch errors here - let ClassCard handle them for error tracking
+  const handleFrameCapture = useCallback(async (classroomId, frameBase64) => {
     await analyzeFrame(classroomId, frameBase64);
-  };
+  }, []);
 
   // Map classroom_id -> video URL (videos have classroom_id; first video per classroom wins)
   const classroomIdToVideoUrl = {};
