@@ -86,6 +86,17 @@ def analyze_frame():
     from app.db.store import upsert_classroom
     upsert_classroom(classroom_id, current_status=new_status)
 
+    # Send pending email if status has been stable for 10 seconds
+    from app.sentinel.rules import process_pending_email
+    classroom_name = None
+    try:
+        from app.db.store import get_classroom_by_id
+        classroom = get_classroom_by_id(classroom_id)
+        classroom_name = classroom.get("name") if classroom else None
+    except Exception:
+        classroom_name = None
+    pending_email = process_pending_email(classroom_id, new_status, classroom_name)
+
     return jsonify({
         "classroom_id": classroom_id,
         "person_count": empty_result["person_count"],
@@ -94,6 +105,7 @@ def analyze_frame():
         "teacher_present": teacher_present,
         "email": mischief_result.get("email") or missing_teacher_result.get("email"),
         "current_status": new_status,
+        "pending_email_sent": True if pending_email else False,
     })
 
 
