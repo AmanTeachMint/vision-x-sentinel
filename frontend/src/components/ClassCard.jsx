@@ -274,8 +274,20 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
             style={{ maxHeight: '240px' }}
           />
         ) : (
-          <div className="w-full bg-gray-800 rounded-md flex items-center justify-center" style={{ maxHeight: '240px', minHeight: '180px' }}>
-            <span className="text-gray-500">No video assigned</span>
+          <div className="w-full bg-gray-800 rounded-md flex flex-col items-center justify-center py-8 px-4" style={{ maxHeight: '240px', minHeight: '180px' }}>
+            {/* Orange WiFi icon with slash */}
+            <svg className="w-12 h-12 mb-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* WiFi signal waves */}
+              <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9z" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              <path d="M5 13l2 2c2.76-2.76 7.24-2.76 10 0l2-2c-4.01-4.01-10.99-4.01-15 0z" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              <path d="M9 17l2 2c.55-.55 1.45-.55 2 0l2-2" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              {/* Diagonal slash */}
+              <line x1="2" y1="2" x2="22" y2="22" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+            <p className="text-white font-semibold text-base mb-2 text-center">Device is offline</p>
+            <p className="text-gray-400 text-xs text-center leading-relaxed">
+              Please check that it's on the same network and updated to firmware version v1.0.9 or above.
+            </p>
           </div>
         )}
         <canvas ref={canvasRef} className="hidden" width="640" height="360" />
