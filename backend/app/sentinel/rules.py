@@ -3,10 +3,10 @@ import threading
 import time
 
 # Empty class: alert after this many seconds with zero persons
-EMPTY_CLASS_DURATION_SEC = 10  # 2 minutes
+EMPTY_CLASS_DURATION_SEC = 20  # 2 minutes
 
 # Mischief detection thresholds
-MOTION_THRESHOLD = 0.25  # Motion score above this triggers increment
+MOTION_THRESHOLD = 0.18  # Motion score above this triggers increment
 MISCHIEF_CONSECUTIVE_COUNT = 3  # Need this many consecutive high-motion frames
 MISCHIEF_COOLDOWN_SEC = 60  # Don't alert again for this many seconds after an alert
 
