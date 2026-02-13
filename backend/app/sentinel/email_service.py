@@ -75,6 +75,13 @@ def send_email_to_admin(
     :param base_url: optional base URL (e.g. https://api.example.com) to turn snapshot path into full URL
     """
     if not Config.ADMIN_EMAIL or not Config.SMTP_HOST or not Config.SMTP_USERNAME or not Config.SMTP_PASSWORD:
+        print("[email_service] Skipping email: SMTP not configured (set ADMIN_EMAIL, SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD in .env)")
+        return False
+
+    # Gmail app passwords are 16 chars; .env sometimes has spaces for readability – strip them
+    smtp_password = (Config.SMTP_PASSWORD or "").replace(" ", "").strip()
+    if not smtp_password:
+        print("[email_service] Skipping email: SMTP_PASSWORD is empty")
         return False
 
     # Make snapshot URL absolute for email link if base_url given
@@ -94,11 +101,15 @@ def send_email_to_admin(
     msg.attach(MIMEText(payload["body_html"], "html"))
 
     try:
-        with smtplib.SMTP(Config.SMTP_HOST, Config.SMTP_PORT) as server:
+        with smtplib.SMTP(Config.SMTP_HOST, Config.SMTP_PORT, timeout=15) as server:
             server.starttls()
-            server.login(Config.SMTP_USERNAME, Config.SMTP_PASSWORD)
+            server.login(Config.SMTP_USERNAME, smtp_password)
             server.sendmail(Config.SMTP_FROM, [Config.ADMIN_EMAIL], msg.as_string())
+        print(f"[email_service] Alert email sent to {Config.ADMIN_EMAIL}")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"[email_service] SMTP login failed (check username/app password): {e}")
+        return False
     except Exception as e:
         print(f"[email_service] Failed to send alert email to admin: {e}")
         return False

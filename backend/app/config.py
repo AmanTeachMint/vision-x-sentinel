@@ -1,8 +1,11 @@
 """Configuration for Vision X Sentinel backend."""
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from backend directory so it works regardless of current working directory
+_backend_root = Path(__file__).resolve().parent.parent
+load_dotenv(dotenv_path=_backend_root / ".env")
 
 class Config:
     """Application configuration."""
