@@ -42,3 +42,17 @@ class Config:
     
     # mock-media at repo root (parent of backend)
     MOCK_MEDIA_DIR = os.path.join(BACKEND_ROOT, '..', 'mock-media')
+
+    # Snapshots directory (saved alert frames)
+    SNAPSHOTS_DIR = os.path.join(BACKEND_ROOT, 'static', 'snapshots')
+
+    # SMTP (optional – if set, intervention emails are sent to admin)
+    SMTP_HOST = os.getenv('SMTP_HOST', '')
+    SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+    SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
+    SMTP_FROM = os.getenv('SMTP_FROM', 'visionx@school.org')
+    # Admin email – receives alert notifications
+    ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', '')
+    # Optional base URL for links in emails (e.g. https://api.yourapp.com)
+    BASE_URL = os.getenv('BASE_URL', '')

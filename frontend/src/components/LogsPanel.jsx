@@ -48,6 +48,26 @@ function LogsPanel({ isOpen, onClose }) {
     }
   };
 
+  // Group alerts by classroom; within each group newest first
+  const alertsByClass = React.useMemo(() => {
+    const groups = {};
+    alerts.forEach((alert) => {
+      const id = alert.classroom_id;
+      if (!groups[id]) groups[id] = [];
+      groups[id].push(alert);
+    });
+    Object.keys(groups).forEach((id) => {
+      groups[id].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    });
+    return Object.keys(groups)
+      .sort((a, b) => (classroomNames[a] || a).localeCompare(classroomNames[b] || b))
+      .map((classroomId) => ({
+        classroomId,
+        classroomName: classroomNames[classroomId] || classroomId,
+        alerts: groups[classroomId],
+      }));
+  }, [alerts, classroomNames]);
+
   if (!isOpen) return null;
 
   return (
@@ -69,33 +89,41 @@ function LogsPanel({ isOpen, onClose }) {
           </div>
         ) : (
           <div className="overflow-y-auto flex-1">
-            {alerts.length === 0 ? (
+            {alertsByClass.length === 0 ? (
               <div className="text-center py-12 text-gray-400">No alerts found</div>
             ) : (
-              <table className="w-full text-left">
-                <thead className="border-b border-gray-700">
-                  <tr>
-                    <th className="pb-2 text-gray-400 font-medium">Time</th>
-                    <th className="pb-2 text-gray-400 font-medium">Classroom</th>
-                    <th className="pb-2 text-gray-400 font-medium">Type</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {alerts.map((alert) => (
-                    <tr key={alert.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                      <td className="py-3 text-sm">{formatTime(alert.timestamp)}</td>
-                      <td className="py-3 text-sm font-medium" title={alert.classroom_id}>
-                        {classroomNames[alert.classroom_id] || alert.classroom_id}
-                      </td>
-                      <td className="py-3 text-sm">
-                        <span className="px-2 py-1 bg-gray-700 rounded text-xs">
-                          {ALERT_LABELS[alert.type] || alert.type}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-6">
+                {alertsByClass.map(({ classroomId, classroomName, alerts: classAlerts }) => (
+                  <div key={classroomId} className="border border-gray-700 rounded-lg overflow-hidden">
+                    <div className="px-4 py-2.5 bg-gray-800/80 border-b border-gray-700 font-medium text-white">
+                      {classroomName}
+                      <span className="ml-2 text-gray-400 font-normal text-sm">
+                        ({classAlerts.length} alert{classAlerts.length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-800/50">
+                        <tr>
+                          <th className="px-4 py-2 text-gray-400 font-medium text-sm">Time</th>
+                          <th className="px-4 py-2 text-gray-400 font-medium text-sm">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {classAlerts.map((alert) => (
+                          <tr key={alert.id} className="border-t border-gray-700/50 hover:bg-gray-800/50">
+                            <td className="px-4 py-2.5 text-sm">{formatTime(alert.timestamp)}</td>
+                            <td className="px-4 py-2.5 text-sm">
+                              <span className="px-2 py-1 bg-gray-700 rounded text-xs">
+                                {ALERT_LABELS[alert.type] || alert.type}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

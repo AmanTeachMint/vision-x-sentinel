@@ -68,8 +68,8 @@ def analyze_frame():
     person_count = count_persons(image)
     motion_score = compute_motion_score(image, prev_frame)
 
-    # Apply rules
-    empty_result = process_empty_class_rule(classroom_id, person_count)
+    # Apply rules (pass frame so snapshot can be saved on alert)
+    empty_result = process_empty_class_rule(classroom_id, person_count, current_frame=image)
     mischief_result = process_mischief_rule(classroom_id, motion_score, image)
 
     return jsonify({

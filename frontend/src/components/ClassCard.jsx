@@ -16,6 +16,8 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
   const retryCheckIntervalRef = useRef(null);
   const onFrameCaptureRef = useRef(onFrameCapture);
   const isSeekingRef = useRef(false);
+  const wasPlayingBeforeSeekRef = useRef(false);
+  const pauseCleanupTimerRef = useRef(null);
   const cameraStreamRef = useRef(null);
   const MAX_CONSECUTIVE_FAILURES = 3;
   const RETRY_CHECK_INTERVAL = 5000;
@@ -245,6 +247,10 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
     };
 
     const cleanup = () => {
+      if (pauseCleanupTimerRef.current) {
+        clearTimeout(pauseCleanupTimerRef.current);
+        pauseCleanupTimerRef.current = null;
+      }
       setIsPlaying(false);
       if (captureIntervalRef.current) {
         clearInterval(captureIntervalRef.current);
@@ -280,14 +286,22 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
     };
 
     const handleSeeking = () => {
+      if (pauseCleanupTimerRef.current) {
+        clearTimeout(pauseCleanupTimerRef.current);
+        pauseCleanupTimerRef.current = null;
+      }
       isSeekingRef.current = true;
+      wasPlayingBeforeSeekRef.current = !video.paused;
     };
-    
+
     const handleSeeked = () => {
       isSeekingRef.current = false;
-      // After seeking completes, if video is playing, ensure capture is running
+      // Many browsers pause the video during seek; resume if it was playing before
+      if (wasPlayingBeforeSeekRef.current) {
+        video.play().catch(() => {});
+      }
+      // If video is already playing (or just resumed), ensure capture is running
       if (!video.paused && video.readyState >= 2) {
-        // Check if intervals are already running
         if (!captureIntervalRef.current && !audioIntervalRef.current) {
           handlePlay();
         }
@@ -295,10 +309,14 @@ function ClassCard({ classroom, videoUrl, onFrameCapture, hasNewAlert = false })
     };
     
     const handlePause = () => {
-      // Don't cleanup if we're seeking (video will resume after seek)
-      if (!isSeekingRef.current) {
-        cleanup();
-      }
+      // Delay cleanup so that if user is seeking, 'seeking' can fire first and we skip cleanup
+      if (pauseCleanupTimerRef.current) clearTimeout(pauseCleanupTimerRef.current);
+      pauseCleanupTimerRef.current = setTimeout(() => {
+        pauseCleanupTimerRef.current = null;
+        if (!isSeekingRef.current) {
+          cleanup();
+        }
+      }, 80);
     };
     
     const handleEnded = () => cleanup();
